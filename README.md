@@ -53,3 +53,11 @@ y abre http://localhost:8000
 - Las elecciones se guardan en cada navegador. Si tú y Nadya revisan en compus distintas, cada quien tendrá su propia selección.
 - Formatos admitidos: JPG, PNG y WEBP. Las fotos HEIC del iPhone hay que convertirlas antes.
 - Sin la carpeta `datos/`, el sitio abre en modo demostración con la contraseña `boda2026`.
+
+## Compartir con la familia
+
+En **Elegidas → Compartir con la familia** se crea un link a `familia/` con una contraseña propia. El link lleva (después del `#`) las llaves de las fotos elegidas, cifradas con esa contraseña; cada foto tiene su propia llave, así que la familia no puede abrir ninguna otra. La galería familiar está en español, francés, inglés y ruso.
+
+Si vuelves a correr `cifrar.py`, todas las llaves cambian y los links que ya mandaste dejan de funcionar.
+
+Para rearmar las páginas después de cambiar `_plantilla.html`, `_app.js`, `_familia_body.html` o `_familia.js`: `py build.py`.

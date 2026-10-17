@@ -130,6 +130,20 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
 .stage img{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;user-select:none;-webkit-user-select:none;will-change:transform}
 .viewer button:focus-visible{outline:1px solid #f2f2f2}
 
+/* Compartir */
+.share{border:1px solid var(--ink);padding:18px;display:flex;flex-direction:column;gap:12px}
+.share-head{display:flex;justify-content:space-between;align-items:center}
+.share h3{margin:0;font-family:var(--display);font-weight:400;font-size:1.5rem}
+.share p{margin:0;color:var(--muted);line-height:1.5;font-size:.88rem}
+.share-label{font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;font-weight:400}
+.share-pw{display:flex;border-bottom:1px solid var(--ink)}
+.share-pw input{flex:1;min-width:0;font:inherit;font-weight:400;font-size:1.05rem;letter-spacing:.04em;border:0;background:transparent;color:var(--ink);padding:10px 2px}
+.share-pw input:focus{outline:none}
+.share-pw button{font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+.share textarea{width:100%;font:inherit;font-size:.82rem;line-height:1.5;border:1px solid var(--line);background:var(--soft);color:var(--ink);padding:10px;resize:none;word-break:break-all}
+.share-actions{display:flex;flex-direction:column;gap:8px}
+a.btn{color:inherit;text-decoration:none;display:block}
+
 /* Avance */
 .progress-box{display:flex;flex-direction:column;gap:8px;align-items:center;padding-top:14px;margin-top:6px;border-top:1px solid var(--line)}
 .saved{margin:0;font-size:.78rem;color:var(--muted);text-align:center}
@@ -202,6 +216,25 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     <div class="grid" id="grid"></div>
     <div class="foot">
       <button class="btn solid" id="dlBtn" type="button">Descargar elegidas · ZIP</button>
+      <button class="btn" id="shareBtn" type="button">Compartir con la familia</button>
+      <section class="share" id="sharePanel" hidden>
+        <div class="share-head"><h3>Compartir con la familia</h3><button type="button" id="shareClose" aria-label="Cerrar">✕</button></div>
+        <p id="shareCount"></p>
+        <label class="share-label" for="sharePw">Contraseña para la familia</label>
+        <div class="share-pw"><input id="sharePw" type="text" autocomplete="off" spellcheck="false"><button type="button" id="sharePwNew">Otra</button></div>
+        <button class="btn solid" id="shareMake" type="button">Crear link</button>
+        <p class="error" id="shareErr" role="alert"></p>
+        <div id="shareResult" hidden>
+          <textarea id="shareText" rows="5" readonly aria-label="Mensaje para compartir"></textarea>
+          <div class="share-actions">
+            <button class="btn solid" id="shareCopy" type="button">Copiar mensaje</button>
+            <a class="btn" id="shareWa" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+            <button class="btn" id="shareNative" type="button" hidden>Más opciones</button>
+          </div>
+          <p class="note" id="shareCopied"></p>
+          <p class="note">Si después cambias tu selección, crea un link nuevo. Los links que ya mandaste siguen mostrando las fotos de antes.</p>
+        </div>
+      </section>
       <button class="btn" id="backBtn" type="button">Seguir revisando</button>
       <p class="note" id="dlNote"></p>
       <div class="progress-box">
@@ -251,13 +284,19 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
       {name:"PBKDF2", salt:b64(cfg.salt), iterations:cfg.iterations, hash:"SHA-256"},
       base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
   }
-  async function decrypt(buf){
-    return crypto.subtle.decrypt({name:"AES-GCM", iv:buf.slice(0,12)}, key, buf.slice(12));
+  async function decrypt(buf, k = key){
+    return crypto.subtle.decrypt({name:"AES-GCM", iv:buf.slice(0,12)}, k, buf.slice(12));
   }
-  async function fetchDecrypt(path, type){
-    const r = await fetch(DATA + path);
-    if (!r.ok) throw new Error("No se encontró " + path);
-    const plain = await decrypt(await r.arrayBuffer());
+  // Cada foto tiene su propia llave (viene en el manifiesto)
+  function photoKey(p){
+    if (!p.k) return Promise.resolve(key);
+    if (!p._k) p._k = crypto.subtle.importKey("raw", b64(p.k), "AES-GCM", false, ["decrypt"]);
+    return p._k;
+  }
+  async function fetchDecrypt(p, sub, type){
+    const r = await fetch(`${DATA}${sub}/${p.id}.bin`);
+    if (!r.ok) throw new Error("No se encontró " + p.id);
+    const plain = await decrypt(await r.arrayBuffer(), await photoKey(p));
     return new Blob([plain], {type});
   }
 
@@ -382,7 +421,7 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
   function getPreview(p){
     if (!previews.has(p.id)){
       const prom = demo ? Promise.resolve(URL.createObjectURL(p.blob))
-                        : fetchDecrypt(`p/${p.id}.bin`, "image/jpeg").then(b => URL.createObjectURL(b));
+                        : fetchDecrypt(p, "p", "image/jpeg").then(b => URL.createObjectURL(b));
       previews.set(p.id, prom);
       if (previews.size > 12){                      // libera memoria de las más viejas
         const [oldId, oldProm] = previews.entries().next().value;
@@ -394,11 +433,11 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
   function getThumb(p){
     if (!thumbs.has(p.id)){
       thumbs.set(p.id, demo ? Promise.resolve(URL.createObjectURL(p.blob))
-                            : fetchDecrypt(`t/${p.id}.bin`, "image/jpeg").then(b => URL.createObjectURL(b)));
+                            : fetchDecrypt(p, "t", "image/jpeg").then(b => URL.createObjectURL(b)));
     }
     return thumbs.get(p.id);
   }
-  const getOriginal = p => demo ? Promise.resolve(p.blob) : fetchDecrypt(`o/${p.id}.bin`, p.type);
+  const getOriginal = p => demo ? Promise.resolve(p.blob) : fetchDecrypt(p, "o", p.type);
 
   // ---------- Vistas ----------
   function go(v){
@@ -512,6 +551,8 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     $("colTitle").textContent = keep ? "Elegidas" : "Papelera";
     $("colSub").textContent = `${list.length} ${list.length===1?"foto":"fotos"}` + (pending ? ` · faltan ${pending} por revisar` : " · revisión completa");
     $("dlBtn").hidden = !keep; $("dlBtn").disabled = !list.length;
+    $("shareBtn").hidden = !keep; $("shareBtn").disabled = !list.length;
+    if (!keep) $("sharePanel").hidden = true;
     const mb = list.reduce((s,p) => s + (p.size||0), 0) / 1e6;
     $("dlBtn").textContent = list.length ? `Descargar elegidas · ZIP · ${mb >= 1000 ? (mb/1000).toFixed(1)+" GB" : Math.round(mb)+" MB"}` : "Descargar elegidas · ZIP";
     $("backBtn").textContent = pending ? "Seguir revisando" : "Revisar todo otra vez";
@@ -561,6 +602,69 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
       note.textContent = "Se interrumpió la descarga. Revisa tu conexión e intenta de nuevo.";
     }finally{ dlRunning = false; $("dlBtn").disabled = false; }
   };
+
+  // ---------- Compartir con la familia ----------
+  // El link lleva, después del #, las llaves SOLO de las fotos elegidas, cifradas con
+  // una contraseña nueva. Lo que va después del # nunca se envía a ningún servidor.
+  const WORDS = "paris louvre sena rosa luna sol flor perla cielo mar vals anillo ramo seda oro plata lirio jazmin olivo nube brisa ola coral menta canela miel".split(" ");
+  const TYPES = ["image/jpeg","image/png","image/webp"];
+  function newFamilyPassword(){
+    const r = crypto.getRandomValues(new Uint32Array(3));
+    return `${WORDS[r[0] % WORDS.length]}-${WORDS[r[1] % WORDS.length]}-${1000 + r[2] % 9000}`;
+  }
+  const b64url = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  async function makeShareLink(list, pw){
+    const body = new Uint8Array(1 + list.length * 19);
+    body[0] = 1;
+    list.forEach((p, i) => {
+      const o = 1 + i*19, n = parseInt(p.id, 10);
+      body[o] = n >> 8; body[o+1] = n & 255;
+      body[o+2] = Math.max(0, TYPES.indexOf(p.type));
+      body.set(b64(p.k), o+3);
+    });
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    const k = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt"]);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, k, body));
+    const all = new Uint8Array(28 + ct.length); all.set(salt); all.set(iv, 16); all.set(ct, 28);
+    return new URL("familia/", location.href).href + "#" + b64url(all);
+  }
+  let shareMsg = "";
+  function openShare(){
+    const sel = photos.filter(p => p.state === "keep");
+    $("sharePanel").hidden = false;
+    $("shareResult").hidden = true;
+    $("shareCount").textContent = `Crea un link con tus ${sel.length} ${sel.length===1?"foto elegida":"fotos elegidas"}. Quien lo abra con la contraseña solo verá esas fotos.`;
+    if (!$("sharePw").value) $("sharePw").value = newFamilyPassword();
+    $("sharePanel").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+  $("shareBtn").onclick = openShare;
+  $("shareClose").onclick = () => { $("sharePanel").hidden = true; };
+  $("sharePwNew").onclick = () => { $("sharePw").value = newFamilyPassword(); $("shareResult").hidden = true; };
+  $("sharePw").addEventListener("input", () => { $("shareResult").hidden = true; });
+  $("shareMake").onclick = async () => {
+    const sel = photos.filter(p => p.state === "keep" && p.k), pw = $("sharePw").value.trim();
+    const err = $("shareErr"); err.textContent = "";
+    if (demo){ err.textContent = "En el modo demostración no se pueden crear links."; return; }
+    if (!sel.length){ err.textContent = "Primero elige al menos una foto."; return; }
+    if (pw.length < 8){ err.textContent = "Usa una contraseña de al menos 8 caracteres."; return; }
+    $("shareMake").disabled = true; $("shareMake").textContent = "Creando…";
+    try{
+      const link = await makeShareLink(sel, pw);
+      shareMsg = `Fotos de nuestra boda\n${link}\n\nContraseña: ${pw}`;
+      $("shareText").value = shareMsg;
+      $("shareWa").href = "https://wa.me/?text=" + encodeURIComponent(shareMsg);
+      $("shareNative").hidden = !navigator.share;
+      $("shareResult").hidden = false;
+      $("shareCopied").textContent = "";
+    }catch(_){ err.textContent = "No se pudo crear el link. Intenta de nuevo."; }
+    finally{ $("shareMake").disabled = false; $("shareMake").textContent = "Crear link"; }
+  };
+  $("shareCopy").onclick = async () => {
+    try{ await navigator.clipboard.writeText(shareMsg); $("shareCopied").textContent = "Mensaje copiado. Pégalo en WhatsApp o en un correo."; }
+    catch(_){ $("shareText").select(); $("shareCopied").textContent = "Selecciona el texto y cópialo."; }
+  };
+  $("shareNative").onclick = () => navigator.share({text: shareMsg}).catch(()=>{});
 
   // ---------- Visor ampliado (zoom) ----------
   const viewer = $("viewer"), stage = $("stage"), vImg = $("vImg");

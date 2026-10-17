@@ -6,7 +6,7 @@ Uso (en Windows, desde la carpeta del proyecto):
 
 Crea la carpeta "datos" junto a este archivo con:
     datos/config.json    sal y parámetros (no secretos)
-    datos/manifest.bin   lista de fotos, cifrada
+    datos/manifest.bin   lista de fotos y la llave de cada una, cifrada con la contraseña
     datos/t/0001.bin     miniatura cifrada (400 px)
     datos/p/0001.bin     vista para revisar cifrada (1800 px)
     datos/o/0001.bin     original cifrado (para la descarga)
@@ -81,7 +81,7 @@ def main():
         (out / sub).mkdir(parents=True)
 
     salt = os.urandom(16)
-    aes = AESGCM(derive_key(password, salt))
+    aes = AESGCM(derive_key(password, salt))   # solo cifra el manifiesto
     manifest, total, big = [], 0, []
 
     for i, path in enumerate(files, 1):
@@ -100,10 +100,14 @@ def main():
             original = resized_jpeg(im, args.max_original, 90)
             mime = "image/jpeg"
 
+        # Cada foto tiene su propia llave: así se puede compartir una selección
+        # sin dar acceso al resto.
+        photo_key = os.urandom(16)
+        paes = AESGCM(photo_key)
         parts = {
-            "t": encrypt(aes, resized_jpeg(im, 400, 72)),
-            "p": encrypt(aes, resized_jpeg(im, 1800, 82)),
-            "o": encrypt(aes, original),
+            "t": encrypt(paes, resized_jpeg(im, 400, 72)),
+            "p": encrypt(paes, resized_jpeg(im, 1800, 82)),
+            "o": encrypt(paes, original),
         }
         for sub, blob in parts.items():
             (out / sub / f"{pid}.bin").write_bytes(blob)
@@ -112,12 +116,13 @@ def main():
                 big.append(path.name)
 
         name = path.name if args.max_original == 0 or mime == EXTS[path.suffix.lower()] else path.stem + ".jpg"
-        manifest.append({"id": pid, "name": name, "type": mime, "size": len(original)})
+        manifest.append({"id": pid, "name": name, "type": mime, "size": len(original),
+                         "k": base64.b64encode(photo_key).decode()})
         print(f"  [{pid}] {path.name}  ({len(raw)/1e6:.1f} MB)")
 
     (out / "manifest.bin").write_bytes(encrypt(aes, json.dumps(manifest, ensure_ascii=False).encode("utf-8")))
     (out / "config.json").write_text(json.dumps({
-        "v": 1, "kdf": "PBKDF2-SHA256", "iterations": ITERATIONS,
+        "v": 2, "kdf": "PBKDF2-SHA256", "iterations": ITERATIONS,
         "salt": base64.b64encode(salt).decode(), "count": len(manifest)
     }, indent=2))
 
