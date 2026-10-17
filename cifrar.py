@@ -13,7 +13,7 @@ Crea la carpeta "datos" junto a este archivo con:
 
 Requisitos:  py -m pip install cryptography pillow
 """
-import argparse, base64, getpass, io, json, os, shutil, sys
+import argparse, base64, getpass, io, json, os, re, shutil, sys
 from pathlib import Path
 
 try:
@@ -59,8 +59,9 @@ def main():
     if not src.is_dir():
         sys.exit(f"No encuentro la carpeta: {src}")
 
-    files = sorted([p for p in src.rglob("*") if p.suffix.lower() in EXTS],
-                   key=lambda p: str(p.relative_to(src)).lower())
+    def natural(p):  # orden 1, 2, 10 en vez de 1, 10, 2
+        return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", str(p.relative_to(src)).lower())]
+    files = sorted([p for p in src.rglob("*") if p.suffix.lower() in EXTS], key=natural)
     if not files:
         sys.exit("No encontré fotos .jpg, .png o .webp en esa carpeta.")
     print(f"Encontré {len(files)} fotos.")
