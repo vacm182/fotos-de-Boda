@@ -110,6 +110,34 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
 .card .wait{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:.7rem;letter-spacing:.22em;text-transform:uppercase}
 .thumb img{opacity:0}.thumb img.ready{opacity:1;transition:opacity .3s}
 #loginForm.busy{opacity:.5;pointer-events:none}
+/* Ampliar */
+.meta .zoombtn{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:400;padding:6px 0}
+.meta .zoombtn:hover{color:var(--ink)}
+.meta .zoombtn svg{width:16px;height:16px}
+.card{cursor:zoom-in}
+.thumb img{cursor:zoom-in}
+.viewer{position:fixed;inset:0;z-index:50;background:#0b0b0b;color:#f2f2f2;display:flex;flex-direction:column}
+.vbar{display:flex;align-items:center;gap:16px;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px))}
+.vbar.bottom{padding:12px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));justify-content:center}
+.vname{flex:1;min-width:0;font-size:.75rem;color:#9a9a9a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vbar button{font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:#f2f2f2;padding:8px 4px}
+.vbar.bottom button{width:44px;height:44px;border:1px solid #333;font-size:1.2rem;letter-spacing:0}
+.vbar.bottom button:hover{border-color:#f2f2f2}
+.vzoom{min-width:56px;text-align:center;font-variant-numeric:tabular-nums;font-size:.8rem}
+.vhint{position:absolute;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom,0px));text-align:center;font-size:.72rem;color:#8a8a8a;pointer-events:none;transition:opacity .6s}
+.stage{flex:1;position:relative;overflow:hidden;touch-action:none;cursor:grab}
+.stage.drag{cursor:grabbing}
+.stage img{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;user-select:none;-webkit-user-select:none;will-change:transform}
+.viewer button:focus-visible{outline:1px solid #f2f2f2}
+
+/* Avance */
+.progress-box{display:flex;flex-direction:column;gap:8px;align-items:center;padding-top:14px;margin-top:6px;border-top:1px solid var(--line)}
+.saved{margin:0;font-size:.78rem;color:var(--muted);text-align:center}
+.links{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:center}
+.links button,.links label{font-size:.78rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer;color:var(--ink)}
+.links input{position:absolute;opacity:0;width:1px;height:1px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--bg);padding:12px 18px;font-size:.82rem;max-width:calc(100% - 32px);text-align:center;transition:opacity .4s}
+
 @media (prefers-reduced-motion:reduce){.hero{animation:none}.landing-inner{animation:none}.card,.track i{transition:none!important}}
 </style>
 </head>
@@ -156,7 +184,7 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
 
   <!-- Revisar -->
   <section id="review" class="review" hidden>
-    <div class="meta"><span class="count" id="counter">1 / 1</span><span class="name" id="fname"></span></div>
+    <div class="meta"><span class="count" id="counter">1 / 1</span><button class="zoombtn" id="zoomBtn" type="button" aria-label="Ampliar foto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg>Ampliar</button></div>
     <div class="track"><i id="bar"></i></div>
     <div class="deck" id="deck"></div>
     <div class="controls">
@@ -164,7 +192,7 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
       <button class="u" id="undoBtn" type="button" aria-label="Deshacer" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
       <button class="k" id="keepBtn" type="button">Conservar →</button>
     </div>
-    <p class="help">Desliza la foto o usa las flechas ← → · Z deshace</p>
+    <p class="help">Desliza la foto o usa las flechas ← → · Toca la foto para ampliarla · Z deshace</p>
   </section>
 
   <!-- Colección -->
@@ -176,8 +204,34 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
       <button class="btn solid" id="dlBtn" type="button">Descargar elegidas · ZIP</button>
       <button class="btn" id="backBtn" type="button">Seguir revisando</button>
       <p class="note" id="dlNote"></p>
+      <div class="progress-box">
+        <p class="saved" id="savedNote">Tu avance se guarda solo en este navegador.</p>
+        <div class="links">
+          <button type="button" id="exportBtn">Guardar avance en un archivo</button>
+          <label>Cargar avance<input id="importInput" type="file" accept=".json,application/json"></label>
+        </div>
+        <p class="note" id="importNote"></p>
+      </div>
     </div>
   </section>
+</div>
+
+<!-- Aviso -->
+<div class="toast" id="toast" role="status" hidden></div>
+
+<!-- Visor ampliado -->
+<div class="viewer" id="viewer" hidden>
+  <div class="vbar">
+    <span class="vname" id="vName"></span>
+    <button type="button" id="vClose" aria-label="Cerrar">Cerrar ✕</button>
+  </div>
+  <div class="stage" id="stage"><img id="vImg" alt="" draggable="false"></div>
+  <div class="vbar bottom">
+    <button type="button" id="vOut" aria-label="Alejar">−</button>
+    <span class="vzoom" id="vZoom">100%</span>
+    <button type="button" id="vIn" aria-label="Acercar">+</button>
+    <span class="vhint" id="vHint">Pellizca, usa la rueda o toca dos veces</span>
+  </div>
 </div>
 
 <script>
@@ -235,8 +289,9 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
         catch(_) { throw new Error("pw"); }
         photos = list.map(m => ({...m, state:null}));
       }
-      restore();
-      enter();
+      const restored = restore();
+      saveState();
+      enter(restored);
     }catch(err){
       key = null;
       $("pwErr").textContent = err.message === "pw" ? "Contraseña incorrecta" : "No se pudieron abrir las fotos. Revisa tu conexión.";
@@ -244,28 +299,83 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     }finally{ form.classList.remove("busy"); }
   });
 
-  function enter(){
+  function enter(restored){
     const l = $("landing");
     l.style.transition = "opacity .6s"; l.style.opacity = 0;
     setTimeout(() => { l.hidden = true; $("app").hidden = false; }, 600);
     const first = photos.findIndex(p => !p.state);
     idx = first === -1 ? photos.length : first;
     go(idx >= photos.length ? (colTab = "keep", "collection") : "review");
+    if (restored){
+      const k = photos.filter(p=>p.state==="keep").length;
+      setTimeout(() => toast(idx >= photos.length
+        ? `Ya revisaste todas. Tienes ${k} fotos elegidas.`
+        : `Seguimos donde te quedaste: foto ${idx+1} de ${photos.length} · ${k} elegidas`), 700);
+    }
   }
 
   // ---------- Elecciones guardadas en el navegador ----------
+  const storeKey = () => STORE + (demo ? "-demo" : "");
+  function stateMap(){ const m = {}; photos.forEach(p => { if (p.state) m[p.name] = p.state; }); return m; }
+  function applyMap(m){
+    let n = 0;
+    photos.forEach(p => { const v = m[p.name] || m[p.id]; p.state = (v==="keep"||v==="trash") ? v : null; if (p.state) n++; });
+    return n;
+  }
+  let savedOk = false;
   function saveState(){
     try{
-      const m = {}; photos.forEach(p => { if (p.state) m[p.id] = p.state; });
-      localStorage.setItem(STORE + (demo ? "-demo" : ""), JSON.stringify(m));
-    }catch(_){}
+      localStorage.setItem(storeKey(), JSON.stringify({v:2, savedAt:Date.now(), states:stateMap()}));
+      savedOk = true;
+    }catch(_){ savedOk = false; }
+    updateSavedNote();
   }
   function restore(){
     try{
-      const m = JSON.parse(localStorage.getItem(STORE + (demo ? "-demo" : "")) || "{}");
-      photos.forEach(p => { p.state = m[p.id] || null; });
-    }catch(_){}
+      const raw = JSON.parse(localStorage.getItem(storeKey()) || "{}");
+      return applyMap(raw.states || raw);   // v1 guardaba el mapa directo
+    }catch(_){ return 0; }
   }
+  // Pide al navegador que no borre el avance por su cuenta (Safari lo hace tras 7 días sin visitas)
+  try{ navigator.storage?.persist?.(); }catch(_){}
+
+  function updateSavedNote(){
+    const el = $("savedNote"); if (!el) return;
+    const done = photos.filter(p=>p.state).length;
+    el.textContent = savedOk
+      ? `Avance guardado en este navegador: ${done} de ${photos.length} fotos revisadas. Para seguir en otro teléfono o compu, guárdalo en un archivo.`
+      : "Este navegador no deja guardar el avance. Guárdalo en un archivo antes de cerrar.";
+  }
+  let toastTimer;
+  function toast(msg){
+    const t = $("toast"); t.textContent = msg; t.hidden = false; t.style.opacity = 1;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.hidden = true, 400); }, 4200);
+  }
+
+  // Exportar / importar avance
+  $("exportBtn").onclick = () => {
+    const data = JSON.stringify({app:"fotos-boda", v:2, savedAt:new Date().toISOString(), total:photos.length, states:stateMap()}, null, 1);
+    const a = document.createElement("a"), url = URL.createObjectURL(new Blob([data], {type:"application/json"}));
+    const d = new Date(), stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    a.href = url; a.download = `avance-boda-${stamp}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    $("importNote").textContent = "Archivo guardado. Ábrelo con «Cargar avance» en cualquier dispositivo.";
+  };
+  $("importInput").addEventListener("change", async e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    try{
+      const raw = JSON.parse(await f.text());
+      if (!raw.states) throw 0;
+      const n = applyMap(raw.states);
+      history = []; saveState();
+      const k = photos.filter(p=>p.state==="keep").length;
+      $("importNote").textContent = `Avance cargado: ${n} fotos revisadas, ${k} elegidas.`;
+      const f2 = photos.findIndex(p=>!p.state); idx = f2 === -1 ? photos.length : f2;
+      drawCollection();
+    }catch(_){ $("importNote").textContent = "Ese archivo no es un avance de este sitio."; }
+  });
 
   // ---------- Imágenes (con caché) ----------
   const previews = new Map(), thumbs = new Map();
@@ -320,7 +430,6 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     $("bar").style.width = (photos.filter(p=>p.state).length / n * 100) + "%";
     if (idx >= n){ colTab = "keep"; go("collection"); return; }
     $("counter").textContent = `${idx+1} / ${n}`;
-    $("fname").textContent = photos[idx].name;
     if (photos[idx+1]) deck.appendChild(card(photos[idx+1], true));
     const c = card(photos[idx], false); deck.appendChild(c); drag(c);
     [1,2,3].forEach(k => photos[idx+k] && getPreview(photos[idx+k]));   // precarga
@@ -335,11 +444,11 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     return el;
   }
   function drag(c){
-    let x0=0, dx=0, on=false;
+    let x0=0, y0=0, dx=0, dy=0, on=false;
     const tk = c.querySelector(".tag.keep"), tt = c.querySelector(".tag.toss");
-    c.addEventListener("pointerdown", e => { on=true; x0=e.clientX; c.setPointerCapture(e.pointerId); c.style.transition="none"; });
+    c.addEventListener("pointerdown", e => { on=true; x0=e.clientX; y0=e.clientY; dx=dy=0; c.setPointerCapture(e.pointerId); c.style.transition="none"; });
     c.addEventListener("pointermove", e => {
-      if(!on) return; dx = e.clientX - x0;
+      if(!on) return; dx = e.clientX - x0; dy = e.clientY - y0;
       c.style.transform = `translateX(${dx}px) rotate(${dx/40}deg)`;
       c.style.opacity = 1 - Math.min(Math.abs(dx)/600, .4);
       tk.style.opacity = Math.max(0, Math.min(1, dx/90));
@@ -347,6 +456,7 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     });
     const end = () => {
       if(!on) return; on=false;
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6){ c.style.transform=""; c.style.opacity=1; dx=dy=0; openViewer(photos[idx]); return; }
       if (dx > 90) decide("keep"); else if (dx < -90) decide("trash");
       else { c.style.transition="transform .3s, opacity .3s"; c.style.transform=""; c.style.opacity=1; tk.style.opacity=tt.style.opacity=0; }
       dx=0;
@@ -373,12 +483,15 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     if (!history.length) return;
     idx = history.pop(); photos[idx].state = null; saveState(); go("review");
   }
+  $("zoomBtn").onclick = () => photos[idx] && openViewer(photos[idx]);
   $("keepBtn").onclick = () => decide("keep");
   $("tossBtn").onclick = () => decide("trash");
   $("undoBtn").onclick = undo;
   addEventListener("keydown", e => {
+    if (!$("viewer").hidden){ if (e.key==="Escape") closeViewer(); return; }
     if (view!=="review" || $("app").hidden) return;
-    if (e.key==="ArrowRight") decide("keep");
+    if (e.key===" " || e.key==="Enter"){ e.preventDefault(); photos[idx] && openViewer(photos[idx]); }
+    else if (e.key==="ArrowRight") decide("keep");
     else if (e.key==="ArrowLeft") decide("trash");
     else if (e.key.toLowerCase()==="z") undo();
   });
@@ -405,12 +518,14 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
     $("backBtn").onclick = pending ? () => $("navReview").onclick()
       : () => { photos.forEach(p=>p.state=null); history=[]; idx=0; saveState(); go("review"); };
     if (!dlRunning) $("dlNote").textContent = "";
+    updateSavedNote();
     const g = $("grid"); g.innerHTML = "";
     if (!list.length){ g.innerHTML = `<p class="empty">${keep ? "Aún no hay fotos elegidas" : "La papelera está vacía"}</p>`; return; }
     list.forEach(p => {
       const d = document.createElement("div"); d.className = "thumb"; d.dataset.id = p.id;
       d.innerHTML = `<img alt=""><button type="button">${keep ? "Mover a papelera" : "Recuperar"}</button>`;
       d.querySelector("button").onclick = () => { p.state = keep ? "trash" : "keep"; saveState(); drawCollection(); };
+      d.querySelector("img").onclick = () => openViewer(p);
       g.appendChild(d); io.observe(d);
     });
   }
@@ -446,6 +561,102 @@ code{font-size:.78rem;background:var(--soft);padding:2px 6px}
       note.textContent = "Se interrumpió la descarga. Revisa tu conexión e intenta de nuevo.";
     }finally{ dlRunning = false; $("dlBtn").disabled = false; }
   };
+
+  // ---------- Visor ampliado (zoom) ----------
+  const viewer = $("viewer"), stage = $("stage"), vImg = $("vImg");
+  let vs = {fit:1, s:1, tx:0, ty:0, w:0, h:0}, vOrigUrl = null, vToken = 0;
+  const MAX = 6;
+  function applyT(){
+    vImg.style.transform = `translate(${vs.tx}px,${vs.ty}px) scale(${vs.fit*vs.s})`;
+    $("vZoom").textContent = Math.round(vs.s*100) + "%";
+  }
+  function clampT(){
+    const W = stage.clientWidth, H = stage.clientHeight, S = vs.fit*vs.s, iw = vs.w*S, ih = vs.h*S;
+    vs.tx = iw <= W ? (W-iw)/2 : Math.min(0, Math.max(W-iw, vs.tx));
+    vs.ty = ih <= H ? (H-ih)/2 : Math.min(0, Math.max(H-ih, vs.ty));
+  }
+  function zoomTo(ns, px, py){
+    ns = Math.max(1, Math.min(MAX, ns));
+    const r = ns / vs.s;
+    vs.tx = px - (px - vs.tx)*r; vs.ty = py - (py - vs.ty)*r; vs.s = ns;
+    clampT(); applyT();
+  }
+  function layout(){
+    const W = stage.clientWidth, H = stage.clientHeight;
+    vs.fit = Math.min(W/vs.w, H/vs.h); vs.s = 1; clampT(); applyT();
+  }
+  async function openViewer(p){
+    const token = ++vToken;
+    viewer.hidden = false; document.body.style.overflow = "hidden";
+    $("vName").textContent = p.name; $("vHint").style.opacity = 1;
+    setTimeout(() => $("vHint").style.opacity = 0, 2500);
+    vImg.removeAttribute("src"); vImg.style.opacity = 0;
+    const url = await getPreview(p).catch(() => null);
+    if (token !== vToken || !url) return;
+    vImg.onload = () => {
+      if (token !== vToken) return;
+      vs.w = vImg.naturalWidth; vs.h = vImg.naturalHeight;
+      vImg.style.width = vs.w + "px"; vImg.style.height = vs.h + "px";
+      layout(); vImg.style.opacity = 1;
+      vImg.onload = null;
+      // Después carga el original para ver el detalle al acercar
+      getOriginal(p).then(b => {
+        if (token !== vToken) return;
+        vOrigUrl = URL.createObjectURL(b); vImg.src = vOrigUrl;
+      }).catch(()=>{});
+    };
+    vImg.src = url;
+  }
+  function closeViewer(){
+    vToken++; viewer.hidden = true; document.body.style.overflow = "";
+    if (vOrigUrl){ URL.revokeObjectURL(vOrigUrl); vOrigUrl = null; }
+  }
+  $("vClose").onclick = closeViewer;
+  $("vIn").onclick = () => zoomTo(vs.s*1.6, stage.clientWidth/2, stage.clientHeight/2);
+  $("vOut").onclick = () => zoomTo(vs.s/1.6, stage.clientWidth/2, stage.clientHeight/2);
+  addEventListener("resize", () => { if (!viewer.hidden && vs.w) layout(); });
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    zoomTo(vs.s * Math.exp(-e.deltaY*0.0022), e.clientX - r.left, e.clientY - r.top);
+  }, {passive:false});
+  const pts = new Map(); let pinch = null, lastTap = 0, moved = 0;
+  stage.addEventListener("pointerdown", e => {
+    stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    moved = 0; stage.classList.add("drag");
+    if (pts.size === 2){
+      const [a,b] = [...pts.values()];
+      pinch = {d:Math.hypot(a.x-b.x, a.y-b.y), s:vs.s};
+    }
+  });
+  stage.addEventListener("pointermove", e => {
+    const prev = pts.get(e.pointerId); if (!prev) return;
+    const cur = {x:e.clientX, y:e.clientY}; pts.set(e.pointerId, cur);
+    const r = stage.getBoundingClientRect();
+    if (pts.size === 2 && pinch){
+      const [a,b] = [...pts.values()];
+      const d = Math.hypot(a.x-b.x, a.y-b.y), mx = (a.x+b.x)/2 - r.left, my = (a.y+b.y)/2 - r.top;
+      vs.tx += (cur.x-prev.x)/2; vs.ty += (cur.y-prev.y)/2;
+      zoomTo(pinch.s * d / pinch.d, mx, my); moved += 10;
+    } else if (pts.size === 1){
+      moved += Math.abs(cur.x-prev.x) + Math.abs(cur.y-prev.y);
+      vs.tx += cur.x-prev.x; vs.ty += cur.y-prev.y; clampT(); applyT();
+    }
+  });
+  const up = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (!pts.size) stage.classList.remove("drag");
+    if (e.type === "pointerup" && moved < 8 && !pts.size){
+      const now = Date.now();
+      if (now - lastTap < 320){
+        const r = stage.getBoundingClientRect();
+        zoomTo(vs.s > 1.05 ? 1 : 2.5, e.clientX - r.left, e.clientY - r.top); lastTap = 0;
+      } else lastTap = now;
+    }
+  };
+  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
 
   // ---------- Modo demostración (cuando aún no hay carpeta datos/) ----------
   async function makeDemo(){
