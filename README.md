@@ -56,7 +56,7 @@ y abre http://localhost:8000
 
 ## Compartir con la familia
 
-En **Elegidas → Compartir con la familia** se crea un link a `familia/` con una contraseña propia. El link lleva (después del `#`) las llaves de las fotos elegidas, cifradas con esa contraseña; cada foto tiene su propia llave, así que la familia no puede abrir ninguna otra. La galería familiar está en español, francés, inglés y ruso.
+En **Elegidas → Compartir con la familia** se crea un link corto a `familia/` con una contraseña propia. El link lleva (después del `#`) la lista de fotos elegidas y la llave familiar, cifrada con esa contraseña. La galería muestra solo las fotos elegidas. Ojo: la llave familiar abre `datos/llaves.bin`, así que alguien con conocimientos técnicos y con un link y su contraseña podría llegar a abrir también las demás fotos. La galería familiar está en español, francés, inglés y ruso.
 
 Si vuelves a correr `cifrar.py`, todas las llaves cambian y los links que ya mandaste dejan de funcionar.
 

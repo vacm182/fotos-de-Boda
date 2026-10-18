@@ -273,7 +273,7 @@ a.btn{color:inherit;text-decoration:none;display:block}
   const DATA = "datos/";
   const ZIP_PART = 400e6;          // tamaño máximo de cada ZIP (bytes)
   const STORE = "boda-estado-v1";  // elecciones guardadas en este navegador
-  let key = null, demo = false;
+  let key = null, demo = false, famKey = null;
   let photos = [], idx = 0, history = [], view = "load", colTab = "keep";
 
   // ---------- Cifrado ----------
@@ -324,7 +324,11 @@ a.btn{color:inherit;text-decoration:none;display:block}
         key = await deriveKey(pw, config);
         const r = await fetch(DATA + "manifest.bin", {cache:"no-store"});
         let list;
-        try { list = JSON.parse(new TextDecoder().decode(await decrypt(await r.arrayBuffer()))); }
+        try {
+          const man = JSON.parse(new TextDecoder().decode(await decrypt(await r.arrayBuffer())));
+          list = Array.isArray(man) ? man : man.photos;
+          famKey = man.f ? b64(man.f) : null;
+        }
         catch(_) { throw new Error("pw"); }
         photos = list.map(m => ({...m, state:null}));
       }
@@ -613,21 +617,19 @@ a.btn{color:inherit;text-decoration:none;display:block}
     return `${WORDS[r[0] % WORDS.length]}-${WORDS[r[1] % WORDS.length]}-${1000 + r[2] % 9000}`;
   }
   const b64url = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  // Link corto: lista de fotos elegidas (1 bit por foto) + llave familiar cifrada con la contraseña.
   async function makeShareLink(list, pw){
-    const body = new Uint8Array(1 + list.length * 19);
-    body[0] = 1;
-    list.forEach((p, i) => {
-      const o = 1 + i*19, n = parseInt(p.id, 10);
-      body[o] = n >> 8; body[o+1] = n & 255;
-      body[o+2] = Math.max(0, TYPES.indexOf(p.type));
-      body.set(b64(p.k), o+3);
-    });
-    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const bits = new Uint8Array(Math.ceil(photos.length / 8));
+    list.forEach(p => { const i = parseInt(p.id, 10) - 1; bits[i >> 3] |= 1 << (i & 7); });
+    let end = bits.length; while (end > 1 && !bits[end-1]) end--;
+    const bitmap = bits.slice(0, end);
+    const salt = crypto.getRandomValues(new Uint8Array(8)), iv = crypto.getRandomValues(new Uint8Array(12));
     const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
     const k = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt"]);
-    const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, k, body));
-    const all = new Uint8Array(28 + ct.length); all.set(salt); all.set(iv, 16); all.set(ct, 28);
-    return new URL("familia/", location.href).href + "#" + b64url(all);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv, additionalData:bitmap}, k, famKey));
+    const all = new Uint8Array(20 + ct.length + bitmap.length);
+    all.set(salt); all.set(iv, 8); all.set(ct, 20); all.set(bitmap, 20 + ct.length);
+    return new URL("familia/", location.href).href + "#2." + b64url(all);
   }
   let shareMsg = "";
   function openShare(){
@@ -643,9 +645,9 @@ a.btn{color:inherit;text-decoration:none;display:block}
   $("sharePwNew").onclick = () => { $("sharePw").value = newFamilyPassword(); $("shareResult").hidden = true; };
   $("sharePw").addEventListener("input", () => { $("shareResult").hidden = true; });
   $("shareMake").onclick = async () => {
-    const sel = photos.filter(p => p.state === "keep" && p.k), pw = $("sharePw").value.trim();
+    const sel = photos.filter(p => p.state === "keep"), pw = $("sharePw").value.trim();
     const err = $("shareErr"); err.textContent = "";
-    if (demo){ err.textContent = "En el modo demostración no se pueden crear links."; return; }
+    if (demo || !famKey){ err.textContent = "Este sitio todavía no tiene activado compartir. Recarga la página."; return; }
     if (!sel.length){ err.textContent = "Primero elige al menos una foto."; return; }
     if (pw.length < 8){ err.textContent = "Usa una contraseña de al menos 8 caracteres."; return; }
     $("shareMake").disabled = true; $("shareMake").textContent = "Creando…";

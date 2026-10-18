@@ -283,10 +283,38 @@ button.thumb{display:block;width:100%}
   // ---------- Leer el link ----------
   let photos = [];
   const fromB64url = s => Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")), c => c.charCodeAt(0));
-  let blob = null;
-  try{ blob = fromB64url(location.hash.slice(1)); if (blob.length < 28 + 16 + 20) blob = null; }catch(_){ blob = null; }
+  // Formato 2 (corto): "#2." + salt(8) iv(12) llaveFamiliar cifrada(32) + fotos elegidas (1 bit por foto)
+  // Formato 1 (largo): llaves de cada foto dentro del link
+  let blob = null, fmt = 1;
+  try{
+    let h = location.hash.slice(1);
+    if (h.startsWith("2.")){ fmt = 2; h = h.slice(2); }
+    blob = fromB64url(h);
+    if (blob.length < (fmt === 2 ? 53 : 64)) blob = null;
+  }catch(_){ blob = null; }
 
+  async function unlock2(pw){
+    const salt = blob.slice(0,8), iv = blob.slice(8,20), ct = blob.slice(20,52), bitmap = blob.slice(52);
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    const k = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+    let fam;
+    try{ fam = await crypto.subtle.decrypt({name:"AES-GCM", iv, additionalData:bitmap}, k, ct); }
+    catch(_){ throw new Error("wrong"); }
+    const r = await fetch(DATA + "llaves.bin", {cache:"no-store"});
+    if (!r.ok) throw new Error("net");
+    const buf = await r.arrayBuffer();
+    const fk = await crypto.subtle.importKey("raw", fam, "AES-GCM", false, ["decrypt"]);
+    const all = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM", iv:buf.slice(0,12)}, fk, buf.slice(12))));
+    const list = [];
+    all.forEach(([id, k64, ti], i) => {
+      if (!(bitmap[i >> 3] & (1 << (i & 7)))) return;
+      list.push({id, type:TYPES[ti] || "image/jpeg", name:`boda-${String(list.length+1).padStart(3,"0")}.${EXT[ti] || "jpg"}`,
+                 raw:Uint8Array.from(atob(k64), c => c.charCodeAt(0))});
+    });
+    return list;
+  }
   async function unlock(pw){
+    if (fmt === 2) return unlock2(pw);
     const salt = blob.slice(0,16), iv = blob.slice(16,28), ct = blob.slice(28);
     const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
     const k = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
@@ -320,7 +348,8 @@ button.thumb{display:block;width:100%}
     if (!blob){ showErr("broken"); return; }
     const form = $("loginForm"); showErr(""); form.classList.add("busy");
     try{
-      try{ photos = await unlock($("pw").value); }catch(_){ throw new Error("wrong"); }
+      try{ photos = await unlock($("pw").value); }
+      catch(e){ throw new Error(e && e.message === "net" ? "net" : "wrong"); }
       enter();
     }catch(err){ showErr(err.message === "wrong" ? "wrong" : "net"); $("pw").select(); }
     finally{ form.classList.remove("busy"); }

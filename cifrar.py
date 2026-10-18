@@ -7,6 +7,7 @@ Uso (en Windows, desde la carpeta del proyecto):
 Crea la carpeta "datos" junto a este archivo con:
     datos/config.json    sal y parámetros (no secretos)
     datos/manifest.bin   lista de fotos y la llave de cada una, cifrada con la contraseña
+    datos/llaves.bin     llaves de las fotos, cifradas con la llave familiar (para los links de la familia)
     datos/t/0001.bin     miniatura cifrada (400 px)
     datos/p/0001.bin     vista para revisar cifrada (1800 px)
     datos/o/0001.bin     original cifrado (para la descarga)
@@ -120,9 +121,16 @@ def main():
                          "k": base64.b64encode(photo_key).decode()})
         print(f"  [{pid}] {path.name}  ({len(raw)/1e6:.1f} MB)")
 
-    (out / "manifest.bin").write_bytes(encrypt(aes, json.dumps(manifest, ensure_ascii=False).encode("utf-8")))
+    # Llave familiar: los links de "Compartir con la familia" la llevan, cifrada con
+    # la contraseña que elige Nadya, junto con la lista de fotos elegidas.
+    fam = os.urandom(16)
+    types = ["image/jpeg", "image/png", "image/webp"]
+    llaves = [[m["id"], m["k"], types.index(m["type"]) if m["type"] in types else 0] for m in manifest]
+    (out / "llaves.bin").write_bytes(encrypt(AESGCM(fam), json.dumps(llaves).encode("utf-8")))
+    man = {"photos": manifest, "f": base64.b64encode(fam).decode()}
+    (out / "manifest.bin").write_bytes(encrypt(aes, json.dumps(man, ensure_ascii=False).encode("utf-8")))
     (out / "config.json").write_text(json.dumps({
-        "v": 2, "kdf": "PBKDF2-SHA256", "iterations": ITERATIONS,
+        "v": 3, "kdf": "PBKDF2-SHA256", "iterations": ITERATIONS,
         "salt": base64.b64encode(salt).decode(), "count": len(manifest)
     }, indent=2))
 
